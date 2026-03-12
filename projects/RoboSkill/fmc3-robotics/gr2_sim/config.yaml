@@ -1,0 +1,32 @@
+server:
+  host: "0.0.0.0"
+  port: 8000
+  transport: "streamable-http"
+
+simulation:
+  headless: false
+  robot_prim_path: "/World/GR2_Bot"
+  auto_start: true
+  spawn_translation: [0.0, 0.0, 0.0]
+  align_to_ground: true
+  ground_clearance: 0.0
+  settle_steps: 80
+
+assets:
+  # Local tested baseline. Relative paths are resolved from this config file.
+  asset_root_dir: "../../../scene_bottle/usds/gr2v4_1_0_fourier_hand_6dof"
+  gr2_usd_path: null
+  use_fixed_usd: true
+
+robot:
+  name: "gr2_sim"
+  control_groups:
+    - head
+    - waist
+    - left_arm
+    - right_arm
+
+motion:
+  default_duration: 1.0
+  command_step_hz: 60
+  blocking_by_default: true

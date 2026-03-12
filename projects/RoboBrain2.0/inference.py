@@ -405,38 +405,209 @@ if __name__ == "__main__":
                                 images.append(img.replace("file://", ""))
             return "\n".join(text_parts).strip(), images
 
+        def _extract_task_focus_text(prompt: str) -> str:
+            patterns = [
+                r"# The task to be completed is:\s*(.+?)\.\s*Your output answer:",
+                r"Task:\s*(.+?)(?:\n\n|$)",
+            ]
+            for pattern in patterns:
+                match = re.search(pattern, prompt, re.IGNORECASE | re.DOTALL)
+                if match:
+                    return match.group(1).strip()
+            return prompt.strip()
+
+        def _match_keyword(text: str, keywords: list[str]) -> bool:
+            return any(keyword in text for keyword in keywords)
+
+        def _build_master_plan(task_text: str) -> str | None:
+            task_lower = task_text.lower()
+            reasoning = (
+                "This task is a short single-robot motion request for gr2_sim. "
+                "The safest baseline decomposition is to keep it as one executable subtask "
+                "that directly maps to the robot's currently supported upper-body control skill, "
+                "instead of expanding it into navigation or manipulation steps that do not exist "
+                "in the current baseline. The robot only exposes upper-body simulation tools such as "
+                "connect_robot, move_named_pose, move_joints, get_joint_state, and related helpers. "
+                "So the task should stay focused on one motion intent and be assigned entirely to gr2_sim."
+            )
+
+            if _match_keyword(task_lower, ["right arm", "右臂", "右胳膊", "右手臂"]):
+                return json.dumps(
+                    {
+                        "reasoning_explanation": reasoning,
+                        "subtask_list": [
+                            {
+                                "robot_name": "gr2_sim",
+                                "subtask": "Raise the right arm of gr2_sim a little.",
+                                "subtask_order": 1,
+                            }
+                        ],
+                    },
+                    ensure_ascii=False,
+                )
+
+            if _match_keyword(task_lower, ["left arm", "左臂", "左胳膊", "左手臂"]):
+                return json.dumps(
+                    {
+                        "reasoning_explanation": reasoning,
+                        "subtask_list": [
+                            {
+                                "robot_name": "gr2_sim",
+                                "subtask": "Raise the left arm of gr2_sim a little.",
+                                "subtask_order": 1,
+                            }
+                        ],
+                    },
+                    ensure_ascii=False,
+                )
+
+            if _match_keyword(task_lower, ["connect", "连接机器人", "启动仿真", "连接仿真"]):
+                return json.dumps(
+                    {
+                        "reasoning_explanation": reasoning,
+                        "subtask_list": [
+                            {
+                                "robot_name": "gr2_sim",
+                                "subtask": "Connect the gr2_sim robot.",
+                                "subtask_order": 1,
+                            }
+                        ],
+                    },
+                    ensure_ascii=False,
+                )
+
+            if _match_keyword(task_lower, ["disconnect", "断开机器人", "停止仿真连接"]):
+                return json.dumps(
+                    {
+                        "reasoning_explanation": reasoning,
+                        "subtask_list": [
+                            {
+                                "robot_name": "gr2_sim",
+                                "subtask": "Disconnect the gr2_sim robot.",
+                                "subtask_order": 1,
+                            }
+                        ],
+                    },
+                    ensure_ascii=False,
+                )
+
+            if _match_keyword(task_lower, ["look left", "向左看", "看左边", "左看"]):
+                return json.dumps(
+                    {
+                        "reasoning_explanation": reasoning,
+                        "subtask_list": [
+                            {
+                                "robot_name": "gr2_sim",
+                                "subtask": "Turn the head of gr2_sim to the left.",
+                                "subtask_order": 1,
+                            }
+                        ],
+                    },
+                    ensure_ascii=False,
+                )
+
+            if _match_keyword(task_lower, ["look right", "向右看", "看右边", "右看"]):
+                return json.dumps(
+                    {
+                        "reasoning_explanation": reasoning,
+                        "subtask_list": [
+                            {
+                                "robot_name": "gr2_sim",
+                                "subtask": "Turn the head of gr2_sim to the right.",
+                                "subtask_order": 1,
+                            }
+                        ],
+                    },
+                    ensure_ascii=False,
+                )
+
+            return None
+
+        def _select_tool_call(task_text: str, tool_names: list[str]) -> tuple[str | None, dict]:
+            task_lower = task_text.lower()
+            tool_set = set(tool_names)
+
+            if "list_named_poses" in tool_set and _match_keyword(
+                task_lower, ["list poses", "named poses", "available poses", "有哪些姿态", "列出姿态"]
+            ):
+                return "list_named_poses", {}
+
+            if "get_joint_state" in tool_set and _match_keyword(
+                task_lower, ["joint state", "joint positions", "当前关节", "关节状态", "当前姿态"]
+            ):
+                return "get_joint_state", {}
+
+            if "disconnect_robot" in tool_set and _match_keyword(
+                task_lower, ["disconnect", "stop robot", "断开", "停止连接"]
+            ):
+                return "disconnect_robot", {}
+
+            if "connect_robot" in tool_set and _match_keyword(
+                task_lower, ["connect", "启动机器人", "连接机器人", "启动仿真", "连接仿真"]
+            ):
+                return "connect_robot", {}
+
+            if "move_named_pose" in tool_set:
+                if _match_keyword(task_lower, ["upper_body_ready", "ready pose", "准备姿态", "准备位置"]):
+                    return "move_named_pose", {"name": "upper_body_ready"}
+                if _match_keyword(task_lower, ["home pose", "go home", "回到初始", "回到home", "复位"]):
+                    return "move_named_pose", {"name": "home"}
+                if _match_keyword(task_lower, ["look left", "看左边", "向左看", "左看"]):
+                    return "move_named_pose", {"name": "look_left"}
+                if _match_keyword(task_lower, ["look right", "看右边", "向右看", "右看"]):
+                    return "move_named_pose", {"name": "look_right"}
+                if _match_keyword(
+                    task_lower,
+                    ["right arm", "right hand", "右臂", "右胳膊", "右手臂"],
+                ):
+                    return "move_named_pose", {"name": "right_arm_up"}
+                if _match_keyword(
+                    task_lower,
+                    ["left arm", "left hand", "左臂", "左胳膊", "左手臂"],
+                ):
+                    return "move_named_pose", {"name": "left_arm_up"}
+
+            for name in tool_names:
+                if name and name.lower() in task_lower:
+                    return name, {}
+
+            return None, {}
+
         @app.post("/v1/chat/completions")
         def chat_completions(req: ChatRequest):
             prompt, images = _extract_user_text_and_images(req.messages)
+            task_text = _extract_task_focus_text(prompt)
             tool_list = req.tools or []
             tool_names = [
                 t.get("function", {}).get("name", "")
                 for t in tool_list
                 if isinstance(t, dict)
             ]
-            prompt_lower = prompt.lower()
-            selected_tool = None
-            tool_args = {}
+            selected_tool, tool_args = _select_tool_call(task_text, tool_names)
 
-            # Heuristic tool selection for RoboOS slaver calls
-            for name in tool_names:
-                if name and name in prompt_lower:
-                    selected_tool = name
-                    break
-            if selected_tool is None:
-                if "wait" in prompt_lower:
-                    selected_tool = "wait"
-                elif "open" in prompt_lower and "gripper" in prompt_lower:
-                    selected_tool = "open_gripper"
-                elif "close" in prompt_lower and "gripper" in prompt_lower:
-                    selected_tool = "close_gripper"
-                elif "connect" in prompt_lower:
-                    selected_tool = "connect_robot"
-                elif "disconnect" in prompt_lower:
-                    selected_tool = "disconnect_robot"
+            if not tool_list and "Please break down the given task into sub-tasks" in prompt:
+                planned = _build_master_plan(task_text)
+                if planned is not None:
+                    return {
+                        "id": "robobrain-chatcmpl",
+                        "object": "chat.completion",
+                        "model": args.model_id,
+                        "usage": {
+                            "prompt_tokens": 0,
+                            "completion_tokens": 0,
+                            "total_tokens": 0,
+                        },
+                        "choices": [
+                            {
+                                "index": 0,
+                                "message": {"role": "assistant", "content": planned},
+                                "finish_reason": "stop",
+                            }
+                        ],
+                    }
 
             if selected_tool == "wait":
-                match = re.search(r"(\d+(?:\.\d+)?)", prompt_lower)
+                match = re.search(r"(\d+(?:\.\d+)?)", task_text.lower())
                 if match:
                     tool_args = {"seconds": float(match.group(1))}
                 else:

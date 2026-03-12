@@ -29,12 +29,12 @@ tts:
 # Cloud Server Infos
 model:
   # Model name for the cloud server
-  model_select: "~/workspace/models/RoboBrain2.0-7B"
+  model_select: "/home/fmc3/hf_models/RoboBrain2.0-3B"
   # Number of retries for planning
   model_retry_planning: 5
   model_dict:
     # Model name for the cloud server
-    cloud_model: "~/workspace/models/RoboBrain2.0-7B"
+    cloud_model: "/home/fmc3/hf_models/RoboBrain2.0-3B"
     # Deploy for the cloud server
     cloud_type: "default"
     # API key for the cloud server

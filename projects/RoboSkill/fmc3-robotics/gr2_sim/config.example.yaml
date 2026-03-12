@@ -1,0 +1,38 @@
+# Example runtime configuration for the GR2 Isaac Lab skill bridge.
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+  transport: "streamable-http"
+
+simulation:
+  headless: false
+  robot_prim_path: "/World/GR2_Bot"
+  # The current baseline preloads the Isaac runtime before serving MCP requests.
+  auto_start: true
+  # Optional XY/Z offset applied after ground alignment.
+  spawn_translation: [0.0, 0.0, 0.0]
+  align_to_ground: true
+  ground_clearance: 0.0
+
+assets:
+  # Prefer setting this in the runtime environment instead of hardcoding
+  # a developer-specific absolute path in source code.
+  gr2_usd_path: "/path/to/gr2v4_1_0_fourier_hand_6dof_fixed.usd"
+  # Alternative: point to the directory that contains the GR2 USD files
+  # and let use_fixed_usd choose the filename.
+  asset_root_dir: null
+  use_fixed_usd: true
+
+robot:
+  name: "gr2_sim"
+  control_groups:
+    - head
+    - waist
+    - left_arm
+    - right_arm
+
+motion:
+  default_duration: 1.0
+  command_step_hz: 60
+  blocking_by_default: true
